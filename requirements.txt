@@ -1,0 +1,11 @@
+# Network Scanner — Python dependencies
+# Install with: pip install -r requirements.txt
+#
+# All core scanning logic uses Python standard library modules only.
+# colorama is the single optional runtime dependency for colourised output.
+# pytest is required only for running the test suite.
+
+colorama>=0.4.6
+
+# Testing (optional — only needed to run tests/)
+pytest>=7.0

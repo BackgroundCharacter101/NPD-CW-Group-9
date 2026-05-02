@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Scan output files (don't commit results)
+*.log
+scan_session.log
+results.json
+results.csv
+*.zip
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Coverage / test
+.coverage
+htmlcov/
+.pytest_cache/
