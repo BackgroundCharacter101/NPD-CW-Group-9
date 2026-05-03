@@ -75,11 +75,6 @@ def get_service(port: int) -> str:
 
 
 def grab_banner(sock: socket.socket, port: int, timeout: float = 1.5) -> str:
-    """
-    Attempt to grab a service banner from an already-open socket.
-    Sends an appropriate probe depending on the port, reads up to 1 KB.
-    Returns the first line of the response (max 120 chars), or empty string.
-    """
     try:
         sock.settimeout(timeout)
         if port in (80, 8080, 8000, 8008):
@@ -100,15 +95,6 @@ def scan_port(
     timeout: float = 1.0,
     grab_banners: bool = True,
 ) -> Tuple[int, bool, str, str]:
-    """
-    Attempt a non-blocking TCP connection to host:port.
-
-    Uses connect_ex() which returns an OS error code on failure (instead of
-    raising an exception), making it safe to call in tight loops.
-
-    Returns:
-        (port, is_open, banner, service_name)
-    """
     service = get_service(port)
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -123,15 +109,6 @@ def scan_port(
 
 
 def parse_ports(port_string: str) -> List[int]:
-    """
-    Parse a port specification into a sorted, deduplicated list of ints.
-
-    Supported formats:
-        80             → single port
-        1-1024         → inclusive range
-        22,80,443      → comma-separated list
-        22,80,8000-8100 → mixed
-    """
     ports: List[int] = []
     for segment in port_string.split(","):
         segment = segment.strip()
@@ -166,14 +143,6 @@ def parse_ports(port_string: str) -> List[int]:
 
 
 def resolve_targets(target: str) -> List[str]:
-    """
-    Resolve a target string to a list of IP address strings.
-
-    Accepts:
-        192.168.1.5        → single IP
-        192.168.1.0/24     → CIDR block (yields all host IPs)
-        example.com        → hostname (resolved via DNS)
-    """
     try:
         network = ipaddress.ip_network(target, strict=False)
         hosts = [str(ip) for ip in network.hosts()]
@@ -190,15 +159,6 @@ def resolve_targets(target: str) -> List[str]:
 
 
 def os_hint_from_ttl(ttl: int) -> str:
-    """
-    Estimate the OS family from an IP TTL value.
-    Different operating systems use different default TTL values:
-      Linux/Android  : 64
-      Windows        : 128
-      Cisco IOS      : 255
-      FreeBSD/macOS  : 64 (sometimes 255)
-    We compare against common thresholds (TTL decrements per hop).
-    """
     if ttl <= 0:
         return "Unknown"
     if ttl <= 64:
@@ -209,15 +169,6 @@ def os_hint_from_ttl(ttl: int) -> str:
 
 
 def ping_sweep(targets: List[str], timeout: float = 1.0) -> List[str]:
-    """
-    Perform a TCP-based 'ping' sweep to discover live hosts.
-
-    Since ICMP requires root/admin privileges on most systems, we use a
-    TCP SYN probe on port 80 (and 443 fallback) to detect live hosts.
-    This is a common technique used by Nmap's -sn (no-port-scan) mode.
-
-    Returns a list of hosts that responded (appear to be alive).
-    """
     alive: List[str] = []
     lock  = threading.Lock()
 
@@ -258,10 +209,6 @@ _total_count = 0
 
 
 def _progress_bar(host: str, port: int, is_open: bool) -> None:
-    """
-    Update and redraw the live scan progress bar on stderr.
-    Thread-safe via _lock.
-    """
     global _done_count
     with _lock:
         _done_count += 1
@@ -291,14 +238,6 @@ def scan_host(
     grab_banners: bool = True,
     show_progress: bool = True,
 ) -> Dict[str, Any]:
-    """
-    Scan all ports on a single host using a ThreadPoolExecutor.
-
-    Each port gets its own thread. Results are collected as futures complete,
-    so fast (refused) connections don't wait on slow (filtered/timed-out) ones.
-
-    Returns a dict with host, open_ports list, and scan metadata.
-    """
     open_ports: List[Dict[str, Any]] = []
     start = time.time()
 
@@ -340,15 +279,6 @@ def scan_network(
     grab_banners: bool = True,
     show_progress: bool = True,
 ) -> List[Dict[str, Any]]:
-    """
-    Scan multiple hosts in parallel (two-level parallelism).
-
-    Level 1: host_threads hosts are scanned concurrently.
-    Level 2: each host uses up to `threads` threads for its ports.
-
-    This gives O(host_threads × threads) concurrent connections,
-    making subnet sweeps dramatically faster than sequential host scanning.
-    """
     global _done_count, _total_count
     _done_count  = 0
     _total_count = len(targets) * len(ports)
@@ -389,9 +319,6 @@ def scan_network(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """
-    Build the argparse CLI parser with a full professional flag set.
-    """
     parser = argparse.ArgumentParser(
         prog="scanner.py",
         description=(
