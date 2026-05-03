@@ -257,3 +257,258 @@ def _is_valid_ip(s: str) -> bool:
         return True
     except ValueError:
         return False
+
+_lock = threading.Lock()
+_done_count = 0
+_total_count = 0
+
+
+def _progress_bar(host: str, port: int, is_open: bool) -> None:
+    """
+    Update and redraw the live scan progress bar on stderr.
+    Thread-safe via _lock.
+    """
+    global _done_count
+    with _lock:
+        _done_count += 1
+        done  = _done_count
+        total = _total_count
+
+    pct    = (done / total * 100) if total else 0
+    filled = int(28 * done / total) if total else 0
+    bar    = "█" * filled + "░" * (28 - filled)
+    status = (
+        f"{C['green']}OPEN{C['reset']}"
+        if is_open
+        else f"{C['dim']}----{C['reset']}"
+    )
+    sys.stderr.write(
+        f"\r  {C['cyan']}{bar}{C['reset']} {pct:5.1f}%  "
+        f"{C['white']}{host}:{port:<5}{C['reset']} {status}   "
+    )
+    sys.stderr.flush()
+
+
+def scan_host(
+    host: str,
+    ports: List[int],
+    timeout: float = 1.0,
+    threads: int = 100,
+    grab_banners: bool = True,
+    show_progress: bool = True,
+) -> Dict[str, Any]:
+    """
+    Scan all ports on a single host using a ThreadPoolExecutor.
+
+    Each port gets its own thread. Results are collected as futures complete,
+    so fast (refused) connections don't wait on slow (filtered/timed-out) ones.
+
+    Returns a dict with host, open_ports list, and scan metadata.
+    """
+    open_ports: List[Dict[str, Any]] = []
+    start = time.time()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as pool:
+        future_map = {
+            pool.submit(scan_port, host, port, timeout, grab_banners): port
+            for port in ports
+        }
+        for future in concurrent.futures.as_completed(future_map):
+            try:
+                port, is_open, banner, service = future.result()
+                if show_progress:
+                    _progress_bar(host, port, is_open)
+                if is_open:
+                    open_ports.append(
+                        {"port": port, "service": service, "banner": banner}
+                    )
+            except Exception:
+                pass  # Individual port failures are silently skipped
+
+    elapsed = round(time.time() - start, 2)
+    open_ports.sort(key=lambda x: x["port"])
+
+    return {
+        "host":           host,
+        "open_ports":     open_ports,
+        "total_scanned":  len(ports),
+        "elapsed_seconds": elapsed,
+        "timestamp":      datetime.now().isoformat(),
+    }
+
+
+def scan_network(
+    targets: List[str],
+    ports: List[int],
+    timeout: float = 1.0,
+    threads: int = 100,
+    host_threads: int = 10,
+    grab_banners: bool = True,
+    show_progress: bool = True,
+) -> List[Dict[str, Any]]:
+    """
+    Scan multiple hosts in parallel (two-level parallelism).
+
+    Level 1: host_threads hosts are scanned concurrently.
+    Level 2: each host uses up to `threads` threads for its ports.
+
+    This gives O(host_threads × threads) concurrent connections,
+    making subnet sweeps dramatically faster than sequential host scanning.
+    """
+    global _done_count, _total_count
+    _done_count  = 0
+    _total_count = len(targets) * len(ports)
+
+    results: List[Dict[str, Any]] = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=host_threads) as pool:
+        future_map = {
+            pool.submit(
+                scan_host, host, ports, timeout, threads, grab_banners, show_progress
+            ): host
+            for host in targets
+        }
+        for future in concurrent.futures.as_completed(future_map):
+            host = future_map[future]
+            try:
+                results.append(future.result())
+            except Exception as exc:
+                results.append(
+                    {
+                        "host":            host,
+                        "error":           str(exc),
+                        "open_ports":      [],
+                        "total_scanned":   0,
+                        "elapsed_seconds": 0,
+                        "timestamp":       datetime.now().isoformat(),
+                    }
+                )
+
+    # Sort results by IP address for clean output
+    results.sort(
+        key=lambda r: (
+            [int(x) for x in r["host"].split(".")]
+            if _is_valid_ip(r["host"])
+            else [r["host"]]
+        )
+    )
+    return results
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """
+    Build the argparse CLI parser with a full professional flag set.
+    """
+    parser = argparse.ArgumentParser(
+        prog="scanner.py",
+        description=(
+            "  Smart Network Scanner — Network Discovery & Auditing Tool\n"
+            "  Multi-threaded · Banner Grabbing · CIDR · JSON/CSV Export"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+examples:
+  Scan a single host over common ports:
+    python scanner.py -t 192.168.1.1 -p 1-1024
+
+  Scan a full /24 subnet, specific ports, 200 threads:
+    python scanner.py -t 192.168.1.0/24 -p 22,80,443,3306 --threads 200
+
+  Full port scan with JSON export:
+    python scanner.py -t 10.0.0.5 -p 1-65535 --threads 500 -o results.json
+
+  Scan a hostname, skip banner grabbing, export to CSV:
+    python scanner.py -t example.com -p 80,443 --no-banner -o results.csv
+
+  Quiet scan (no progress bar — good for piping):
+    python scanner.py -t 10.0.0.1 -p 1-1024 --quiet
+  Ping sweep (host discovery only, no port scan):
+    python scanner.py -t 192.168.1.0/24 --ping-sweep
+
+  Scan only top 100 common ports:
+    python scanner.py -t 192.168.1.1 --top-ports
+        """,
+    )
+
+    parser.add_argument(
+        "--version", "-V",
+        action="version",
+        version="SmartScanner v1.0.0 — Network Discovery & Auditing Tool",
+    )
+
+    required = parser.add_argument_group("required arguments")
+    required.add_argument(
+        "--target", "-t",
+        required=True,
+        metavar="HOST/CIDR",
+        help="Target IP, hostname, or CIDR block (e.g. 192.168.1.0/24)",
+    )
+
+    scan_opts = parser.add_argument_group("scan options")
+    scan_opts.add_argument(
+        "--ports", "-p",
+        default="1-1024",
+        metavar="PORTS",
+        help=(
+            "Ports to scan. Supports: single (80), range (1-1024), "
+            "comma list (22,80,443), or mixed (22,80,8000-8100). "
+            "[default: 1-1024]"
+        ),
+    )
+    scan_opts.add_argument(
+        "--threads", "-T",
+        type=int,
+        default=100,
+        metavar="N",
+        help="Threads per host — controls port-level parallelism [default: 100]",
+    )
+    scan_opts.add_argument(
+        "--host-threads",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Hosts to scan in parallel [default: 10]",
+    )
+    scan_opts.add_argument(
+        "--timeout", "-to",
+        type=float,
+        default=1.0,
+        metavar="SEC",
+        help="TCP connection timeout in seconds [default: 1.0]",
+    )
+    scan_opts.add_argument(
+        "--top-ports",
+        action="store_true",
+        help=f"Scan the top {len(TOP_100_PORTS)} most commonly used ports (overrides --ports)",
+    )
+    scan_opts.add_argument(
+        "--ping-sweep",
+        action="store_true",
+        help="Discover live hosts only (TCP probe on ports 80/443/22/445) — no port scan",
+    )
+    scan_opts.add_argument(
+        "--no-banner",
+        action="store_true",
+        help="Skip banner grabbing (faster, less noisy on the network)",
+    )
+
+    output_opts = parser.add_argument_group("output options")
+    output_opts.add_argument(
+        "--output", "-o",
+        metavar="FILE",
+        help="Export results to a file (.json or .csv auto-detected by extension)",
+    )
+    output_opts.add_argument(
+        "--log",
+        metavar="FILE",
+        default="scan_session.log",
+        help="Session log file path [default: scan_session.log]",
+    )
+    output_opts.add_argument(
+        "--quiet", "-q",
+        action="store_true",
+        help="Suppress the live progress bar",
+    )
+
+    return parser
+
