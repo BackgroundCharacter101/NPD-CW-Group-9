@@ -24,7 +24,6 @@
 | **JSON & CSV export** | Machine-readable output for reporting and further analysis |
 | **Session logging** | Every open port and scan event written to a timestamped log file |
 | **Colorized output** | Full-colour terminal UI via `colorama` (graceful fallback if not installed) |
-| **Unit tests** | 36 pytest tests covering all five phases — 100% pass rate |
 
 ---
 
@@ -35,8 +34,7 @@
 | **Phase 1** | TCP scanner (`scan_port`), banner grabbing (`grab_banner`), service map (`COMMON_SERVICES`, `get_service`) | Member 1 |
 | **Phase 2** | CIDR/hostname resolver (`resolve_targets`), flexible port parser (`parse_ports`) | Member 1 |
 | **Phase 3** | `ThreadPoolExecutor` engine (`scan_host`, `scan_network`), live progress bar, argparse CLI | Member 2 |
-| **Phase 4** | Ping sweep (`ping_sweep`), OS fingerprinting (`os_hint_from_ttl`), top-ports list | Member 2 |
-| **Phase 5** | JSON/CSV export, session logging, colorized ASCII UI, full `main()` orchestrator, unit tests, README | Member 3 |
+| **Phase 5** | JSON/CSV export, session logging, colorized ASCII UI, full `main()` orchestrator, README | Member 3 |
 
 ---
 
@@ -44,7 +42,6 @@
 
 - **Python 3.8+**
 - **colorama** (optional — for coloured output)
-- **pytest** (optional — only needed to run the test suite)
 
 No other external dependencies. All core modules (`socket`, `ipaddress`, `argparse`, `concurrent.futures`, `threading`, `json`, `csv`, `logging`) are part of the Python standard library.
 
@@ -205,27 +202,11 @@ python scanner.py -t 192.168.1.1 --top-ports
 
 ---
 
-## Running Tests
-
-```bash
-# Install test dependency
-pip install pytest
-
-# Run all 36 unit tests
-python -m pytest tests/ -v
-```
-
-All 36 tests cover Phases 1–5 without requiring a live network connection.
-
----
-
 ## Project Structure
 
 ```
 NPD-CW-Group-9/
 ├── scanner.py          ← Main source code (all five phases)
-├── tests/
-│   └── test_scanner.py ← 36 unit tests (pytest)
 ├── README.md           ← This file
 ├── requirements.txt    ← Python dependencies
 └── .gitignore          ← Git ignore rules
@@ -239,7 +220,7 @@ NPD-CW-Group-9/
 |---|---|---|
 | **Member 1** | Phase 1 + 2 | TCP scanner, banner grabbing, service map (60+ entries), subnet/port parsers |
 | **Member 2** | Phase 3 + 4 | ThreadPoolExecutor engine, parallel host scanning, ping sweep, OS fingerprinting, argparse CLI |
-| **Member 3** | Phase 5 + Integration | GitHub repo setup, output layer, JSON/CSV export, logging, unit tests (36 tests), README |
+| **Member 3** | Phase 5 + Integration | GitHub repo setup, output layer, JSON/CSV export, logging, README |
 
 Each member must have visible commit history on the GitHub repository.
 
