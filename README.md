@@ -2,10 +2,6 @@
 
 > High-performance, multi-threaded TCP port scanner for internal network auditing.
 
-**Course:** Python Programming – Network Programming Design  
-**Assignment:** Group Assignment (Phase 1–5)  
-**Due:** Sunday, 3 May 2026 | **Viva:** Monday, 4 May 2026
-
 ---
 
 ## Features
