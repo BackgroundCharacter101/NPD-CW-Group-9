@@ -11,17 +11,10 @@ import logging
 from datetime import datetime
 from typing import List, Optional, Tuple, Dict, Any
 
-# Ensure stdout/stderr use UTF-8 so box-drawing and block characters
-# render correctly on Windows (avoids cp1252 UnicodeEncodeError).
 if sys.platform == "win32":
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  COLOR LAYER  (Member 3 — Output & UI)
-# ══════════════════════════════════════════════════════════════════════════════
 
 try:
     import colorama
@@ -45,21 +38,6 @@ except ImportError:
     )}
     HAS_COLOR = False
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  MEMBER 1 — CORE NETWORKING LAYER
-#
-#  Commit 1 ▸ feat: add TCP port scanner with timeout handling
-#             scan_port(), grab_banner()
-#
-#  Commit 2 ▸ feat: add subnet/host parser supporting CIDR and hostnames
-#             resolve_targets(), parse_ports()
-#
-#  Commit 3 ▸ feat: add extended service fingerprinting map
-#             COMMON_SERVICES dict, get_service()
-# ══════════════════════════════════════════════════════════════════════════════
-
-# Service fingerprint map — port → service name
 COMMON_SERVICES: Dict[int, str] = {
     20: "FTP-Data",    21: "FTP",           22: "SSH",         23: "Telnet",
     25: "SMTP",        53: "DNS",           67: "DHCP",        68: "DHCP",
@@ -111,7 +89,7 @@ def grab_banner(sock: socket.socket, port: int, timeout: float = 1.5) -> str:
             sock.sendall(b"HEAD / HTTP/1.0\r\nHost: localhost\r\n\r\n")
         elif port in (443, 8443):
             return "TLS/SSL — use --tls flag to negotiate (not implemented here)"
-        # SSH / FTP / SMTP send a banner automatically on connect — just read
+        # SSH / FTP / SMTP send a banner automatically on connect
         data = sock.recv(1024)
         banner = data.decode("utf-8", errors="replace").strip()
         first_line = banner.split("\n")[0].strip()
