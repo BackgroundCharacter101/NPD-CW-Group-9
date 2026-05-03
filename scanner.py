@@ -56,14 +56,12 @@ COMMON_SERVICES: Dict[int, str] = {
  27018: "MongoDB",   28015: "RethinkDB", 50070: "Hadoop-NN",
 }
 
-# Top 100 most commonly scanned TCP ports (shortcut for --top-ports flag)
 TOP_100_PORTS: List[int] = sorted([
     21, 22, 23, 25, 53, 80, 110, 111, 119, 123, 135, 139, 143, 161, 194,
     389, 443, 445, 465, 514, 587, 631, 636, 993, 995, 1433, 1521, 1723,
     2049, 2181, 3000, 3306, 3389, 4369, 5000, 5432, 5672, 5900, 5985,
     6379, 6443, 7001, 8080, 8443, 8888, 9090, 9092, 9200, 9300, 9418,
     10250, 27017, 27018, 28015, 50070,
-    # Additional well-known ports
     20, 67, 68, 69, 79, 88, 102, 109, 113, 115, 137, 138, 156, 179, 199,
     211, 212, 264, 308, 383, 366, 369, 370, 372, 411, 412, 427, 444,
     500, 512, 513, 515, 520, 554, 601,
@@ -84,12 +82,10 @@ def grab_banner(sock: socket.socket, port: int, timeout: float = 1.5) -> str:
     """
     try:
         sock.settimeout(timeout)
-        # HTTP probe
         if port in (80, 8080, 8000, 8008):
             sock.sendall(b"HEAD / HTTP/1.0\r\nHost: localhost\r\n\r\n")
         elif port in (443, 8443):
             return "TLS/SSL — use --tls flag to negotiate (not implemented here)"
-        # SSH / FTP / SMTP send a banner automatically on connect
         data = sock.recv(1024)
         banner = data.decode("utf-8", errors="replace").strip()
         first_line = banner.split("\n")[0].strip()
@@ -182,12 +178,10 @@ def resolve_targets(target: str) -> List[str]:
         network = ipaddress.ip_network(target, strict=False)
         hosts = [str(ip) for ip in network.hosts()]
         if not hosts:
-            # /32 or /128 — single host
             hosts = [str(network.network_address)]
         return hosts
     except ValueError:
         pass
-    # Hostname
     try:
         resolved_ip = socket.gethostbyname(target)
         return [resolved_ip]
@@ -384,7 +378,6 @@ def scan_network(
                     }
                 )
 
-    # Sort results by IP address for clean output
     results.sort(
         key=lambda r: (
             [int(x) for x in r["host"].split(".")]

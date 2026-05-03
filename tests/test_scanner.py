@@ -15,16 +15,12 @@ import csv
 import tempfile
 import argparse
 
-# Make parent directory importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 import scanner as sc
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  PHASE 1 — Core Networking Layer
-# ─────────────────────────────────────────────────────────────────────────────
 
 class TestServiceFingerprinting:
     """Phase 1 — service map and get_service()."""
@@ -100,7 +96,6 @@ class TestResolveTargets:
 
     def test_cidr_24(self):
         result = sc.resolve_targets("192.168.1.0/30")
-        # /30 gives 2 usable host IPs
         assert len(result) == 2
         assert "192.168.1.1" in result
         assert "192.168.1.2" in result
@@ -120,9 +115,6 @@ class TestResolveTargets:
         assert sc._is_valid_ip("") is False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  PHASE 4 — OS Fingerprinting & Ping Sweep
-# ─────────────────────────────────────────────────────────────────────────────
 
 class TestOsHint:
     """Phase 4 — os_hint_from_ttl()."""
@@ -161,9 +153,6 @@ class TestTopPorts:
             assert 1 <= p <= 65535
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  PHASE 5 — Export & Logging
-# ─────────────────────────────────────────────────────────────────────────────
 
 SAMPLE_RESULTS = [
     {
@@ -225,7 +214,6 @@ class TestExportCsv:
             sc.export_csv(SAMPLE_RESULTS, path)
             with open(path, newline="", encoding="utf-8") as f:
                 rows = list(csv.DictReader(f))
-            # 2 open ports → 2 rows
             assert len(rows) == 2
             assert rows[0]["host"] == "192.168.1.1"
             assert rows[0]["port"] == "22"
@@ -243,7 +231,6 @@ class TestSetupLogging:
         try:
             logger = sc.setup_logging(path)
             logger.info("test message")
-            # Close all handlers so Windows releases the file lock
             for h in logger.handlers[:]:
                 h.close()
                 logger.removeHandler(h)
